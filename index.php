@@ -44,9 +44,9 @@ try {
 
         
         <main class="game-board" id="game-board">
-            <img src="assets/clouds.png" class="clouds" alt="Nuvens">
+            <img src="assets/nuvem.png" class="nuvem" alt="Nuvens">
             <img src="assets/mario.gif" class="mario" alt="Mario">
-            <img src="assets/pipe.png" class="pipe" alt="Cano">
+            <img src="assets/obstaculo.png" class="obstaculo" alt="Placa">
             <span class="jump-tip" id="jump-tip">Pressione ESPAÇO ou clique para pular</span>
         </main>
     </div>
@@ -74,16 +74,38 @@ try {
                 </div>
                 <div class="input-group">
                     <label for="character-select">ESCOLHA SEU PERSONAGEM:</label>
-                    <select id="character-select">
-                    <option value="mario">Mario</option>
-                    <option value="luigi">Shadow</option>
-                    <option value="toad">Pikachu</option>
-                    <option value="toad">Gato</option>
-                    </select>
-                </div>
+                    <div class="input-group">
 
+                        <div class="character-options">
+
+                            <label class="character-card">
+                                <input type="radio" name="character" value="mario" checked>
+                                <img src="assets/marioo.gif" alt="Mario">
+                                <span>Mario</span>
+                            </label>
+
+                            <label class="character-card">
+                                <input type="radio" name="character" value="shadow">
+                                <img src="assets/shadow.gif" alt="Shadow">
+                                <span>Shadow</span>
+                            </label>
+
+                            <label class="character-card">
+                                <input type="radio" name="character" value="pikachu">
+                                <img src="assets/pikachu.gif" alt="Pikachu">
+                                <span>Pikachu</span>
+                            </label>
+
+                            <label class="character-card">
+                                <input type="radio" name="character" value="gato">
+                                <img src="assets/gato.gif" alt="Gato">
+                                <span>Gato</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
                 <div class="modal-actions">
-                    <button type="submit" class="btn btn-primary" id="btn-start">INICIAR JOGO</button>
+                    <button type="submit" class="btn btn-primary" id="btn-start-game">INICIAR JOGO</button>
                     <button type="button" class="btn btn-secondary" id="btn-view-ranking">VER RANKING</button>
                 </div>
             </form>

@@ -72,13 +72,13 @@ body {
     margin: 0 auto;
     position: relative;
     overflow: hidden;
-    background: linear-gradient(#87ceeb, #e0f6ff);
+    background: linear-gradient(#ebb487, #fff6e0);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     cursor: pointer;
 }
 
 /* Elementos do Jogo */
-.pipe {
+.nuvem {
     position: absolute;
     bottom: 0;
     width: 80px;
@@ -92,8 +92,25 @@ body {
     left: 20px;
     z-index: 10;
 }
-
-.clouds {
+.obstaculo {
+    width: 80px;
+    height: 100px;
+    object-fit: contain;
+    position: absolute;
+    bottom: 0;
+    right: -80px;
+    z-index: 5;
+    filter: drop-shadow(2px 3px 4px #00000050);
+}
+@keyframes mover-obstaculo {
+    from {
+        right: -80px;
+    }
+    to {
+        right: 100%;
+    }
+}
+.nuvem {
     position: absolute;
     width: 550px;
     top: 30px;
@@ -114,19 +131,19 @@ body {
 }
 
 /* Animações ativas durante o jogo */
-.game-board.running .pipe {
-    animation: pipe-animation 1.6s infinite linear;
+.game-board.running .nuvem {
+    animation: nuvem-animation 1.6s infinite linear;
 }
 
-.game-board.running .clouds {
-    animation: clouds-animation 18s infinite linear;
+.game-board.running .nuvem {
+    animation: nuvem-animation 18s infinite linear;
 }
 
 .jump {
     animation: jump-animation 500ms ease-out;
 }
 
-@keyframes pipe-animation {
+@keyframes nuvem-animation {
     from {
         right: -80px;
     }
@@ -150,7 +167,7 @@ body {
     }
 }
 
-@keyframes clouds-animation {
+@keyframes nuvem-animation {
     from {
         right: -550px;
     }
@@ -458,7 +475,7 @@ body {
     .mario {
         width: 100px;
     }
-    .pipe {
+    .nuvem {
         width: 60px;
     }
     .hud-bar {
@@ -476,5 +493,86 @@ body {
     .btn {
         font-size: 10px;
         padding: 12px 14px;
+    }
+}
+/* Área de seleção dos personagens */
+.character-options {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+/* Cartão de cada personagem */
+.character-card {
+    width: 90px;
+    min-height: 115px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 3px solid #dddddd;
+    border-radius: 15px;
+    padding: 10px;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+/* Esconde o círculo padrão do botão de seleção */
+.character-card input[type="radio"] {
+    accent-color: #22c55e;
+    cursor: pointer;
+}
+
+/* Imagens dos personagens */
+.character-card img {
+    width: 65px;
+    height: 65px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+/* Nome de cada personagem */
+.character-card span {
+    font-size: 13px;
+    font-weight: bold;
+    color: #222222;
+}
+
+/* Efeito ao passar o mouse */
+.character-card:hover {
+    transform: translateY(-5px);
+    border-color: #60a5fa;
+    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Personagem selecionado */
+.character-card:has(input:checked) {
+    border-color: #22c55e;
+    background: #dcfce7;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+    transform: scale(1.05);
+}
+
+/* Ajuste para telas pequenas */
+@media (max-width: 480px) {
+    .character-options {
+        gap: 8px;
+    }
+
+    .character-card {
+        width: 75px;
+        min-height: 100px;
+        padding: 6px;
+    }
+
+    .character-card img {
+        width: 55px;
+        height: 55px;
     }
 }
