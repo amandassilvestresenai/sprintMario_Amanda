@@ -47,7 +47,7 @@ try {
 
         
         <main class="game-board" id="game-board">
-            <img src="assets/nuvem.png" class="nuvem" alt="Nuvens">
+            <img src="assets/passaros.gif" class="nuvem" alt="Passaros">
             <img src="assets/mario.gif" class="mario" alt="Mario">
             <img src="assets/pedraa.gif" class="obstaculo" alt="Pedra">
             <span class="jump-tip" id="jump-tip">Pressione ESPAÇO ou clique para pular</span>

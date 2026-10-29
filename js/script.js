@@ -28,15 +28,53 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPlaying = false;
     let gameLoop = null;
     let scoreLoop = null;
+    let birdTimeout = null;
     let spawnTimeout = null;
     let obstaculos = [];
     let moedas = [];
-    const JUMP_MS = 700;
+    const JUMP_MS = 850;
+    mario.style.setProperty('--jump-ms', `${JUMP_MS}ms`);
     let jumpEndsAt = 0;
     let jumpQueued = false;
     let coinTimeout = null;
     let obstacleSpeed = 2.4;
+    let coinCount = 0;
+    let currentLevel = 1;
 
+    // Quantos pontos cada moeda vale
+    const COIN_POINTS = 10;
+    // Chance (0 a 1) de uma pedra ter moedas por cima
+    const COIN_CHANCE = 0.6;
+
+    // Níveis: a partir de X pontos, a pedra leva Y segundos para cruzar a tela
+    // (menos segundos = mais rápido). Ajuste à vontade.
+    const LEVELS = [
+        { score: 0,     speed: 2.40 }, // nível 1
+        { score: 100,   speed: 2.31 }, // nível 2
+        { score: 250,   speed: 2.20 }, // nível 3
+        { score: 450,   speed: 2.12 }, // nível 4
+        { score: 700,   speed: 2.04 }, // nível 5
+        { score: 1000,  speed: 1.90 }, // nível 6
+        { score: 1350,  speed: 1.82 }, // nível 7
+        { score: 1750,  speed: 1.70 }, // nível 8
+        { score: 2200,  speed: 1.62 }, // nível 9
+        { score: 2700,  speed: 1.55 }, // nível 10
+        { score: 3250,  speed: 1.46 }, // nível 11
+        { score: 3850,  speed: 1.40 }, // nível 12
+        { score: 4500,  speed: 1.32 }, // nível 13
+        { score: 5200,  speed: 1.23 }, // nível 14
+        { score: 5950,  speed: 1.15 }, // nível 15
+        { score: 6750,  speed: 1.04 }, // nível 16
+        { score: 7600,  speed: 0.90 }, // nível 17
+        { score: 8500,  speed: 0.82 }, // nível 18
+        { score: 9450,  speed: 0.70 }, // nível 19
+        { score: 10450, speed: 0.60 }, // nível 20
+        { score: 11500, speed: 0.47 }, // nível 21
+        { score: 12600, speed: 0.35 }, // nível 22
+        { score: 13750, speed: 0.25 }, // nível 23
+        { score: 14950, speed: 0.15 }, // nível 24
+        { score: 16200, speed: 0.08 }  // nível 25 (máximo)
+    ];
     let currentCharacterImage = 'assets/marioo.gif';
 
     const characterImages = {
@@ -57,6 +95,87 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     document.head.appendChild(obstacleStyle);
+
+    // ----- HUD extra: moedas e nível (criados por aqui, sem mexer no HTML) -----
+    const hudBar = document.querySelector('.hud-bar');
+
+    function criarItemHud(rotulo, valorInicial) {
+        const box = document.createElement('div');
+        box.className = 'score-info';
+        box.innerHTML =
+            `<span class="label">${rotulo}</span><span class="value">${valorInicial}</span>`;
+        hudBar.appendChild(box);
+        return box.querySelector('.value');
+    }
+
+    const coinDisplay = criarItemHud('MOEDAS', '0');
+    const levelDisplay = criarItemHud('NÍVEL', '1');
+
+    // ----- Sons (gerados pelo navegador, não precisa de arquivo) -----
+    let audioCtx = null;
+
+    function tocarTom(freqInicial, freqFinal, duracao, tipo = 'square', volume = 0.08) {
+        try {
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const t = audioCtx.currentTime;
+
+            osc.type = tipo;
+            osc.frequency.setValueAtTime(freqInicial, t);
+            osc.frequency.exponentialRampToValueAtTime(freqFinal, t + duracao);
+
+            gain.gain.setValueAtTime(volume, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + duracao);
+
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + duracao);
+        } catch (err) {
+            // Sem áudio disponível: o jogo segue normalmente
+        }
+    }
+
+    function somPulo() {
+        tocarTom(280, 700, 0.18);
+    }
+
+    function somMoeda() {
+        tocarTom(988, 988, 0.08, 'square', 0.06);
+        setTimeout(() => tocarTom(1319, 1319, 0.18, 'square', 0.06), 80);
+    }
+
+    function somNivel() {
+        tocarTom(523, 1047, 0.35, 'triangle', 0.12);
+    }
+
+    // ----- Níveis -----
+    function updateLevel() {
+        let nivel = 1;
+
+        for (let i = 0; i < LEVELS.length; i++) {
+            if (score >= LEVELS[i].score) nivel = i + 1;
+        }
+
+        if (nivel === currentLevel) return;
+
+        currentLevel = nivel;
+        obstacleSpeed = LEVELS[nivel - 1].speed; // vale para os próximos obstáculos
+        levelDisplay.textContent = nivel;
+
+        mostrarAvisoNivel(nivel);
+        somNivel();
+    }
+
+    function mostrarAvisoNivel(nivel) {
+        const aviso = document.createElement('div');
+        aviso.className = 'level-banner';
+        aviso.textContent = nivel === LEVELS.length ? 'NÍVEL MÁXIMO!' : `NÍVEL ${nivel}!`;
+        gameBoard.appendChild(aviso);
+        setTimeout(() => aviso.remove(), 1200);
+    }
 
     // A imagem original será usada como modelo
     if (obstaculoTemplate) {
@@ -82,6 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
         isPlaying = true;
 
         scoreDisplay.textContent = '0';
+        coinCount = 0;
+        coinDisplay.textContent = '0';
+        currentLevel = 1;
+        levelDisplay.textContent = '1';
         hudPlayerName.textContent = currentPlayer || 'Jogador';
 
         gameBoard.classList.add('running');
@@ -95,49 +218,89 @@ document.addEventListener('DOMContentLoaded', () => {
             score++;
             scoreDisplay.textContent = score;
 
-            if (score >= 80 && obstacleSpeed > 1.6) {
-                obstacleSpeed = 1.6;
-            } else if (score >= 40 && obstacleSpeed > 2.0) {
-                obstacleSpeed = 2.0;
-            }
+            updateLevel();
         }, 100);
 
         spawnObstacle();
-        coinTimeout = setTimeout(spawnCoin, 900);
+        spawnPassaro();
 
         // Verifica colisões
         gameLoop = setInterval(checkCollision, 10);
     }
-        function spawnCoin() {
-            if (!isPlaying || !gameBoard) return;
+    // Cria uma moeda que anda junto com a pedra (mesma animação e velocidade)
+    function criarMoeda(deslocamentoX, altura) {
+        const moeda = document.createElement('div');
+        moeda.className = 'moeda';
+        moeda.style.bottom = `${altura}px`;
+        moeda.style.marginLeft = `${deslocamentoX}px`;
+        moeda.style.animation =
+            `mover-obstaculo ${obstacleSpeed}s linear forwards, girar-moeda 0.6s ease-in-out infinite`;
 
-            const moeda = document.createElement('div');
-            moeda.className = 'moeda';
+        gameBoard.appendChild(moeda);
+        moedas.push(moeda);
 
-            // Altura que exige pulo (entre 170px e 230px)
-            moeda.style.bottom = `${165 + Math.random() * 45}px`;
-            moeda.style.animation =
-                `mover-obstaculo ${obstacleSpeed}s linear forwards, girar-moeda 0.6s ease-in-out infinite`;
+        moeda.addEventListener('animationend', e => {
+            if (e.animationName !== 'mover-obstaculo') return;
+            moeda.remove();
+            moedas = moedas.filter(item => item !== moeda);
+        });
+    }
 
-            gameBoard.appendChild(moeda);
-            moedas.push(moeda);
+    // Em algumas pedras (varia), coloca de 1 a 3 moedas por cima
+    function spawnCoinsOnObstacle() {
+        if (Math.random() > COIN_CHANCE) return; // nem toda pedra tem moeda
 
-            moeda.addEventListener('animationend', e => {
-                if (e.animationName !== 'mover-obstaculo') return;
-                moeda.remove();
-                moedas = moedas.filter(item => item !== moeda);
-            });
+        const quantidade = 1 + Math.floor(Math.random() * 3); // 1, 2 ou 3
+        const larguraMoeda = 36;
+        const espaco = 14;
+        const larguraPedra = 220;
 
-            coinTimeout = setTimeout(spawnCoin, 2200 + Math.random() * 1800);
+        const larguraGrupo = quantidade * larguraMoeda + (quantidade - 1) * espaco;
+        const inicio = (larguraPedra - larguraGrupo) / 2;
+        const altura = 130 + Math.random() * 20; // logo acima da pedra
+
+        for (let i = 0; i < quantidade; i++) {
+            criarMoeda(inicio + i * (larguraMoeda + espaco), altura);
         }
+    }
+
+    // Pássaros voando no céu
+    function spawnPassaro() {
+        if (!isPlaying || !gameBoard) return;
+
+        const passaro = document.createElement('div');
+        passaro.className = 'passaro';
+        passaro.innerHTML = `
+            <svg viewBox="0 0 50 24">
+                <path class="asa" fill="#2b2b2b"
+                    d="M2 14 Q14 0 25 12 Q36 0 48 14 Q36 8 25 17 Q14 8 2 14Z"/>
+            </svg>`;
+
+        const tamanho = 30 + Math.random() * 30;              // 30 a 60px
+        passaro.style.width = `${tamanho}px`;
+        passaro.style.height = `${tamanho / 2}px`;
+        passaro.style.top = `${20 + Math.random() * 130}px`;  // altura no céu
+        passaro.style.animationDuration = `${8 + Math.random() * 6}s`; // velocidade
+
+        gameBoard.appendChild(passaro);
+
+        passaro.addEventListener('animationend', e => {
+            if (e.animationName !== 'voar-passaro') return;
+            passaro.remove();
+        });
+
+        birdTimeout = setTimeout(spawnPassaro, 1500 + Math.random() * 2500);
+    }
 
     function resetElements() {
         clearTimeout(spawnTimeout);
         clearTimeout(coinTimeout);
+        clearTimeout(birdTimeout);
 
         document.querySelectorAll('.obstaculo-clone').forEach(item => item.remove());
         document.querySelectorAll('.moeda').forEach(item => item.remove());
         document.querySelectorAll('.explosao').forEach(item => item.remove());
+        document.querySelectorAll('.passaro').forEach(item => item.remove());
 
         moedas = [];
         obstaculos = [];
@@ -156,6 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
         mario.src = currentCharacterImage;
         mario.style.animation = '';
         mario.style.bottom = '0px';
+        mario.style.left = '20px';
+        mario.style.transform = '';
+        mario.style.removeProperty('--avanco-pulo');
         mario.style.width = '';
         mario.style.marginLeft = '';
         mario.classList.remove('jump');
@@ -177,20 +343,21 @@ document.addEventListener('DOMContentLoaded', () => {
         novoObstaculo.style.bottom = '-30px';
         novoObstaculo.style.left = '100%';
         novoObstaculo.style.right = 'auto';
-        novoObstaculo.style.width = '250px';
-        novoObstaculo.style.height = '140px';
+        novoObstaculo.style.width = '220px';
+        novoObstaculo.style.height = '110px';
         novoObstaculo.style.objectFit = 'fill';
 
         novoObstaculo.style.animation =
             `mover-obstaculo ${obstacleSpeed}s linear forwards`;
 
         novoObstaculo.style.bottom = '-30px';
-        novoObstaculo.style.width = '250px';
-        novoObstaculo.style.height = '140px';
+        novoObstaculo.style.width = '220px';
+        novoObstaculo.style.height = '110px';
         novoObstaculo.style.objectFit = 'contain';
 
         gameBoard.appendChild(novoObstaculo);
         obstaculos.push(novoObstaculo);
+        spawnCoinsOnObstacle();
 
         novoObstaculo.addEventListener('animationend', () => {
             novoObstaculo.remove();
@@ -210,14 +377,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isPlaying) return;
 
         if (mario.classList.contains('jump')) {
-            // Só guarda o pulo se faltar pouco para pousar
             if (jumpEndsAt - performance.now() < 250) {
                 jumpQueued = true;
             }
             return;
-        }
+        }   
+
+        const posicaoAtual =
+            parseFloat(getComputedStyle(mario).left) || 20;
+
+        const novaPosicao = posicaoAtual;
+        const distancia = 0;
+
+        mario.style.left = `${posicaoAtual}px`;
+        mario.style.setProperty('--avanco-pulo', `${distancia}px`);
 
         mario.classList.add('jump');
+        somPulo();
         jumpEndsAt = performance.now() + JUMP_MS;
 
         if (jumpTip) {
@@ -225,11 +401,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setTimeout(() => {
+            mario.style.left = `${novaPosicao}px`;
+            mario.style.removeProperty('--avanco-pulo');
             mario.classList.remove('jump');
 
             if (jumpQueued && isPlaying) {
                 jumpQueued = false;
-                void mario.offsetWidth; // reinicia a animação
                 jump();
             }
         }, JUMP_MS);
@@ -244,10 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const obstaculoRect = obstaculo.getBoundingClientRect();
 
             const colidiu =
-                obstaculoRect.left < marioRect.right - 50 &&
-                obstaculoRect.right > marioRect.left + 50 &&
-                obstaculoRect.top < marioRect.bottom - 10 &&
-                obstaculoRect.bottom > marioRect.top + 10;
+                obstaculoRect.left + 45 < marioRect.right - 35 &&
+                obstaculoRect.right - 45 > marioRect.left + 35 &&
+                obstaculoRect.top + 15 < marioRect.bottom - 10 &&
+                obstaculoRect.bottom - 10 > marioRect.top + 20;
 
             if (colidiu) {
                 triggerGameOver(obstaculo);
@@ -270,7 +447,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (pegou) {
                 moeda.remove();
                 moedas = moedas.filter(item => item !== moeda);
-                score += 10;
+                score += COIN_POINTS;
+                coinCount++;
+                coinDisplay.textContent = coinCount;
+                somMoeda();
+                updateLevel();
                 scoreDisplay.textContent = score;
             }
         }
@@ -318,6 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(scoreLoop);
         clearTimeout(spawnTimeout);
         clearTimeout(coinTimeout);
+        clearTimeout(birdTimeout);
         moedas.forEach(item => {
         item.style.animationPlayState = 'paused';
         });
@@ -472,6 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Iniciar o jogo
+    // Iniciar o jogo
     startForm.addEventListener('submit', e => {
         e.preventDefault();
 
@@ -483,17 +666,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         currentPlayer = nameValue;
-
         localStorage.setItem('mario_jump_player', currentPlayer);
 
-        const personagemSelecionado = document.querySelector(
-            'input[name="character"]:checked'
-        );
+        // Captura o personagem selecionado ANTES de iniciar o jogo
+        const personagemSelecionado = document.querySelector('input[name="character"]:checked');
+        currentCharacterImage = characterImages[personagemSelecionado?.value] || 'assets/marioo.gif';
 
-        currentCharacterImage =
-        characterImages[personagemSelecionado?.value] || 'assets/marioo.gif';
         startModal.classList.remove('active');
-
         startGame();
     });
 
@@ -508,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameoverModal.classList.add('active');
     });
 
-    // Jogar novamente
+    // Jogar novamente (Mantém o jogador e o personagem escolhidos)
     btnRestart.addEventListener('click', () => {
         gameoverModal.classList.remove('active');
 
@@ -527,22 +706,27 @@ document.addEventListener('DOMContentLoaded', () => {
         resetElements();
 
         startModal.classList.add('active');
-        playerInput.value = '';
+        playerInput.value = currentPlayer; // Mantém o nome anterior no campo para facilitar
         playerInput.focus();
     });
 
-    // Pular usando Espaço ou seta para cima
+    // Controlo de Pulo - Teclado
     document.addEventListener('keydown', e => {
-        if (
-            e.code === 'Space' ||
-            e.key === ' ' ||
-            e.code === 'ArrowUp'
-        ) {
+        if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
             if (isPlaying) {
                 e.preventDefault();
                 jump();
             }
         }
     });
-    gameBoard.addEventListener('pointerdown', jump);
+
+    // Controlo de Pulo - Clique/Toque (Apenas durante a partida e fora de modais)
+    gameBoard.addEventListener('click', (e) => {
+        if (!isPlaying) return;
+        
+        // Evita acionar o pulo ao clicar dentro de elementos de modal ou botões
+        if (e.target.closest('.modal-card')) return;
+
+        jump();
+    });
 });
