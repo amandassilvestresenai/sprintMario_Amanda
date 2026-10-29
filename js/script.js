@@ -30,13 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let scoreLoop = null;
     let spawnTimeout = null;
     let obstaculos = [];
+    let moedas = [];
+    const JUMP_MS = 700;
+    let jumpEndsAt = 0;
+    let jumpQueued = false;
+    let coinTimeout = null;
     let obstacleSpeed = 2.4;
 
     let currentCharacterImage = 'assets/marioo.gif';
-
-    const characterSelect = document.querySelector(
-        'input[name="character"]:checked'
-    );
 
     const characterImages = {
         mario: 'assets/marioo.gif',
@@ -73,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(gameLoop);
         clearInterval(scoreLoop);
         clearTimeout(spawnTimeout);
+        clearTimeout(coinTimeout);
 
         resetElements();
 
@@ -93,29 +95,56 @@ document.addEventListener('DOMContentLoaded', () => {
             score++;
             scoreDisplay.textContent = score;
 
-            if (score === 40) {
-                obstacleSpeed = 2.0;
-            } else if (score === 80) {
+            if (score >= 80 && obstacleSpeed > 1.6) {
                 obstacleSpeed = 1.6;
+            } else if (score >= 40 && obstacleSpeed > 2.0) {
+                obstacleSpeed = 2.0;
             }
         }, 100);
 
-        // Começa a criar obstáculos automaticamente
         spawnObstacle();
+        coinTimeout = setTimeout(spawnCoin, 900);
 
         // Verifica colisões
         gameLoop = setInterval(checkCollision, 10);
     }
+        function spawnCoin() {
+            if (!isPlaying || !gameBoard) return;
+
+            const moeda = document.createElement('div');
+            moeda.className = 'moeda';
+
+            // Altura que exige pulo (entre 170px e 230px)
+            moeda.style.bottom = `${165 + Math.random() * 45}px`;
+            moeda.style.animation =
+                `mover-obstaculo ${obstacleSpeed}s linear forwards, girar-moeda 0.6s ease-in-out infinite`;
+
+            gameBoard.appendChild(moeda);
+            moedas.push(moeda);
+
+            moeda.addEventListener('animationend', e => {
+                if (e.animationName !== 'mover-obstaculo') return;
+                moeda.remove();
+                moedas = moedas.filter(item => item !== moeda);
+            });
+
+            coinTimeout = setTimeout(spawnCoin, 2200 + Math.random() * 1800);
+        }
 
     function resetElements() {
         clearTimeout(spawnTimeout);
+        clearTimeout(coinTimeout);
 
-        document.querySelectorAll('.obstaculo-clone').forEach(item => {
-            item.remove();
-        });
+        document.querySelectorAll('.obstaculo-clone').forEach(item => item.remove());
+        document.querySelectorAll('.moeda').forEach(item => item.remove());
+        document.querySelectorAll('.explosao').forEach(item => item.remove());
 
+        moedas = [];
         obstaculos = [];
         obstacleSpeed = 2.4;
+        jumpQueued = false;
+
+        mario.style.visibility = 'visible';
 
         if (obstaculoTemplate) {
             obstaculoTemplate.style.display = 'none';
@@ -145,14 +174,20 @@ document.addEventListener('DOMContentLoaded', () => {
         novoObstaculo.classList.add('obstaculo-clone');
         novoObstaculo.style.display = 'block';
         novoObstaculo.style.position = 'absolute';
-        novoObstaculo.style.bottom = '0';
+        novoObstaculo.style.bottom = '-30px';
         novoObstaculo.style.left = '100%';
         novoObstaculo.style.right = 'auto';
+        novoObstaculo.style.width = '250px';
+        novoObstaculo.style.height = '140px';
+        novoObstaculo.style.objectFit = 'fill';
+
         novoObstaculo.style.animation =
             `mover-obstaculo ${obstacleSpeed}s linear forwards`;
 
-        novoObstaculo.style.width = '80px';
-        novoObstaculo.style.height = '100px';
+        novoObstaculo.style.bottom = '-30px';
+        novoObstaculo.style.width = '250px';
+        novoObstaculo.style.height = '140px';
+        novoObstaculo.style.objectFit = 'contain';
 
         gameBoard.appendChild(novoObstaculo);
         obstaculos.push(novoObstaculo);
@@ -173,9 +208,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function jump() {
         if (!isPlaying) return;
-        if (mario.classList.contains('jump')) return;
+
+        if (mario.classList.contains('jump')) {
+            // Só guarda o pulo se faltar pouco para pousar
+            if (jumpEndsAt - performance.now() < 250) {
+                jumpQueued = true;
+            }
+            return;
+        }
 
         mario.classList.add('jump');
+        jumpEndsAt = performance.now() + JUMP_MS;
 
         if (jumpTip) {
             jumpTip.style.opacity = '0';
@@ -183,20 +226,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setTimeout(() => {
             mario.classList.remove('jump');
-        }, 500);
+
+            if (jumpQueued && isPlaying) {
+                jumpQueued = false;
+                void mario.offsetWidth; // reinicia a animação
+                jump();
+            }
+        }, JUMP_MS);
     }
 
     function checkCollision() {
         if (!isPlaying) return;
 
         const marioRect = mario.getBoundingClientRect();
-
+        
         for (const obstaculo of obstaculos) {
             const obstaculoRect = obstaculo.getBoundingClientRect();
 
             const colidiu =
-                obstaculoRect.left < marioRect.right - 15 &&
-                obstaculoRect.right > marioRect.left + 15 &&
+                obstaculoRect.left < marioRect.right - 50 &&
+                obstaculoRect.right > marioRect.left + 50 &&
                 obstaculoRect.top < marioRect.bottom - 10 &&
                 obstaculoRect.bottom > marioRect.top + 10;
 
@@ -205,6 +254,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             }
         }
+
+        if (!isPlaying) return;
+
+            // Coleta de moedas
+        for (const moeda of [...moedas]) {
+            const r = moeda.getBoundingClientRect();
+
+            const pegou =
+                r.left < marioRect.right - 30 &&
+                r.right > marioRect.left + 30 &&
+                r.top < marioRect.bottom &&
+                r.bottom > marioRect.top;
+
+            if (pegou) {
+                moeda.remove();
+                moedas = moedas.filter(item => item !== moeda);
+                score += 10;
+                scoreDisplay.textContent = score;
+            }
+        }
+    }
+
+    function showExplosion() {
+        const marioRect = mario.getBoundingClientRect();
+        const boardRect = gameBoard.getBoundingClientRect();
+        const size = 160; // tamanho da explosão em px
+
+        const explosion = document.createElement('img');
+        explosion.className = 'explosao';
+
+        // O "?t=" faz o GIF recomeçar do zero a cada Game Over
+        explosion.src = `assets/explosao.gif?t=${Date.now()}`;
+        explosion.style.width = `${size}px`;
+        explosion.style.height = `${size}px`;
+
+        // Centraliza a explosão no personagem
+        explosion.style.left =
+            `${marioRect.left - boardRect.left - gameBoard.clientLeft
+            + marioRect.width / 2 - size / 2}px`;
+        explosion.style.top =
+            `${marioRect.top - boardRect.top - gameBoard.clientTop
+            + marioRect.height / 2 - size / 2}px`;
+
+        gameBoard.appendChild(explosion);
+
+        // Esconde o personagem enquanto explode
+        mario.style.visibility = 'hidden';
+
+        // Remove a explosão quando o GIF termina (ajuste ao tempo do seu GIF)
+        setTimeout(() => {
+            explosion.remove();
+            mario.style.visibility = 'visible';
+            }, 900);
     }
 
     function triggerGameOver(obstaculo) {
@@ -215,6 +317,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(gameLoop);
         clearInterval(scoreLoop);
         clearTimeout(spawnTimeout);
+        clearTimeout(coinTimeout);
+        moedas.forEach(item => {
+        item.style.animationPlayState = 'paused';
+        });
 
         gameBoard.classList.remove('running');
 
@@ -233,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${obstaculoRect.left - boardRect.left}px`;
             obstaculo.style.right = 'auto';
         }
-
+        showExplosion();
         // Mostra a imagem de Game Over
         const marioPosition = parseFloat(
             getComputedStyle(mario).bottom
@@ -380,6 +486,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         localStorage.setItem('mario_jump_player', currentPlayer);
 
+        const personagemSelecionado = document.querySelector(
+            'input[name="character"]:checked'
+        );
+
         currentCharacterImage =
         characterImages[personagemSelecionado?.value] || 'assets/marioo.gif';
         startModal.classList.remove('active');
@@ -434,4 +544,5 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    gameBoard.addEventListener('pointerdown', jump);
 });

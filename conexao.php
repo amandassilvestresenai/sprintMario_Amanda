@@ -17,7 +17,7 @@
         );
 
         $pdo->exec(
-            "CREATE DATABASE IF NOT EXISTS `dbname`"
+            "CREATE DATABASE IF NOT EXISTS `$dbname`"
         );
 
         $pdo->exec("USE `$dbname`");

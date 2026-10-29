@@ -24,7 +24,10 @@ try {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RagePlay - Jogo com Ranking MySQL</title>
-    
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -46,7 +49,7 @@ try {
         <main class="game-board" id="game-board">
             <img src="assets/nuvem.png" class="nuvem" alt="Nuvens">
             <img src="assets/mario.gif" class="mario" alt="Mario">
-            <img src="assets/obstaculo.png" class="obstaculo" alt="Placa">
+            <img src="assets/pedraa.gif" class="obstaculo" alt="Pedra">
             <span class="jump-tip" id="jump-tip">Pressione ESPAÇO ou clique para pular</span>
         </main>
     </div>
